@@ -19,7 +19,7 @@ contract voting {
     candidate[] public candidates;
 
     // Creating candidates
-    function createCandidate(string memory _candidateName) public {
+    function addCandidate(string memory _candidateName) public {
         candidates.push(candidate(_candidateName, 0));
     }
 
