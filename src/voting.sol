@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 contract Voting {
+    uint256 MINIMUM_AGE = 18;
     struct Voter {
         string s_name;
         uint256 s_age;
@@ -16,35 +17,68 @@ contract Voting {
     mapping(address => Voter) public voters;
     Candidate[] public candidates;
 
-    address public owner;
+    address private owner;
+
+    // Events
+    event CandidateAdded(string candidateName);
+    event VoterRegistered(address voterAddress, string voterName);
+    event VoteCast(address voterAddress, string candidateName);
 
     constructor() {
         owner = msg.sender;
     }
 
+    // Modifier to allow only the owner to perform certain actions
     modifier onlyOwner() {
         require(msg.sender == owner, "Not authorized");
+        _;
+    }
+
+    // Modifier to ensure the voter is registered
+    modifier isRegistered() {
+        require(
+            bytes(voters[msg.sender].s_name).length > 0,
+            "Voter is not registered"
+        );
+        _;
+    }
+
+    // Modifier to ensure the voter has not voted yet
+    modifier hasNotVoted() {
+        require(!voters[msg.sender].s_voted, "Voter has already voted");
+        _;
+    }
+
+    // Modifier to ensure the voter is of age (18 or older)
+    modifier isOfAge() {
+        require(
+            voters[msg.sender].s_age >= MINIMUM_AGE,
+            "Voter must be 18 or older"
+        );
         _;
     }
 
     // Add a candidate (only the owner can do this)
     function addCandidate(string memory _candidateName) public onlyOwner {
         candidates.push(Candidate(_candidateName, 0));
+        emit CandidateAdded(_candidateName); // Emit event
     }
 
     // Register a voter
-    function registerVoter(string memory _name, uint256 _age) public {
+    function registerVoter(
+        string memory _name,
+        uint256 _age
+    ) public onlyOwner isOfAge {
         require(voters[msg.sender].s_age == 0, "Voter is already registered");
-        require(_age >= 18, "Voter must be 18 or older");
         voters[msg.sender] = Voter(_name, _age, false);
+        emit VoterRegistered(msg.sender, _name); // Emit event
     }
 
     // Vote for a candidate
-    function vote(string memory _candidateName) public {
+    function vote(
+        string memory _candidateName
+    ) public isRegistered hasNotVoted isOfAge {
         Voter storage sender = voters[msg.sender];
-        require(sender.s_age > 0, "Voter is not registered");
-        require(!sender.s_voted, "Voter has already voted");
-
         bool candidateExists = false;
 
         for (uint256 i = 0; i < candidates.length; i++) {
@@ -54,6 +88,7 @@ contract Voting {
             ) {
                 candidates[i].s_totalVotes += 1;
                 candidateExists = true;
+                emit VoteCast(msg.sender, _candidateName); // Emit event
                 break;
             }
         }
@@ -98,7 +133,7 @@ contract Voting {
             }
         }
 
-        require(!isTie, "There is a tie");
+        require(!isTie, "There is a tie, no winner can be determined");
         return winner;
     }
 }
